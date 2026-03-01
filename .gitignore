@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# GCP Credentials (중요: 절대 올리지 마세요)
+credentials/
+*.json
+
+# Data & Results
+data/
+*.xlsx
+*.csv
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
