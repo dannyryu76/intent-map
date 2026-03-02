@@ -29,9 +29,10 @@ vertexai.init(
 bq_client = bigquery.Client(credentials=credentials, project=CONFIG["PROJECT_ID"])
 
 def fetch_bq_data():
-    """BigQuery에서 검색 데이터를 로드합니다."""
-    query = f"SELECT {CONFIG['COL_KEYWORD']}, {CONFIG['COL_VOLUME']} FROM `{CONFIG['BQ_TABLE_ID']}`"
-    print(f"📡 BigQuery 데이터 로드 중: {CONFIG['BQ_TABLE_ID']}")
+    """BigQuery에서 검색 데이터와 메타데이터를 로드합니다."""
+    metadata_cols = ", ".join(CONFIG["COL_METADATA"])
+    query = f"SELECT {CONFIG['COL_KEYWORD']}, {CONFIG['COL_VOLUME']}, {metadata_cols} FROM `{CONFIG['BQ_TABLE_ID']}`"
+    print(f"📡 BigQuery 데이터 로드 중 (비용 효율적 단일 스캔): {CONFIG['BQ_TABLE_ID']}")
     return bq_client.query(query).to_dataframe()
 
 def get_embeddings(texts):
@@ -76,18 +77,39 @@ async def analyze_topic_intent(semaphore, model, topic_id, keywords):
             return {"topic_id": topic_id, "topic_name": "Error", "intent": f"분석 오류: {str(e)}"}
 
 async def main():
-    # 1. 데이터 로드
-    df = fetch_bq_data()
+    # 1. 데이터 로드 (캐시 확인)
+    if CONFIG["USE_RESTORE"] and os.path.exists(CONFIG["CACHE_BQ_DATA"]):
+        print(f"📦 캐시된 BigQuery 데이터를 로드합니다: {CONFIG['CACHE_BQ_DATA']}")
+        df = pd.read_csv(CONFIG["CACHE_BQ_DATA"])
+    else:
+        df = fetch_bq_data()
+        if CONFIG["USE_RESTORE"]:
+            df.to_csv(CONFIG["CACHE_BQ_DATA"], index=False)
+            print(f"💾 BigQuery 데이터를 캐시했습니다: {CONFIG['CACHE_BQ_DATA']}")
     
-    # 2. 임베딩 생성 (5만 개 기준 약 수 분 소요)
-    embeddings = get_embeddings(df[CONFIG["COL_KEYWORD"]])
+    # 2. 임베딩 생성 (캐시 확인)
+    if CONFIG["USE_RESTORE"] and os.path.exists(CONFIG["CACHE_EMBEDDINGS"]):
+        print(f"📦 캐시된 임베딩 데이터를 로드합니다: {CONFIG['CACHE_EMBEDDINGS']}")
+        embeddings = np.load(CONFIG["CACHE_EMBEDDINGS"])
+    else:
+        embeddings = get_embeddings(df[CONFIG["COL_KEYWORD"]])
+        if CONFIG["USE_RESTORE"]:
+            np.save(CONFIG["CACHE_EMBEDDINGS"], embeddings)
+            print(f"💾 임베딩 데이터를 캐시했습니다: {CONFIG['CACHE_EMBEDDINGS']}")
     
-    # 3. 토픽(클러스터) 생성
-    print(f"🧩 {CONFIG['NUM_TOPICS']}개의 토픽으로 군집화 중...")
-    kmeans = KMeans(n_clusters=CONFIG["NUM_TOPICS"], random_state=42, n_init=10)
-    df["topic_id"] = kmeans.fit_predict(embeddings)
+    # 3. 토픽(클러스터) 생성 (캐시 확인)
+    if CONFIG["USE_RESTORE"] and os.path.exists(CONFIG["CACHE_CLUSTERS"]):
+        print(f"📦 캐시된 클러스터 데이터를 로드합니다: {CONFIG['CACHE_CLUSTERS']}")
+        df = pd.read_csv(CONFIG["CACHE_CLUSTERS"])
+    else:
+        print(f"🧩 {CONFIG['NUM_TOPICS']}개의 토픽으로 군집화 중...")
+        kmeans = KMeans(n_clusters=CONFIG["NUM_TOPICS"], random_state=42, n_init=10)
+        df["topic_id"] = kmeans.fit_predict(embeddings)
+        if CONFIG["USE_RESTORE"]:
+            df.to_csv(CONFIG["CACHE_CLUSTERS"], index=False)
+            print(f"💾 클러스터 데이터를 캐시했습니다: {CONFIG['CACHE_CLUSTERS']}")
     
-    # 4. 토픽 요약 (검색량 합계 및 대표 키워드 추출)
+    # 4. 토픽 요약
     topic_summary = df.groupby("topic_id").agg({
         CONFIG["COL_VOLUME"]: "sum",
         CONFIG["COL_KEYWORD"]: lambda x: x.tolist()

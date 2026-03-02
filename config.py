@@ -19,6 +19,9 @@ CONFIG = {
     "COL_KEYWORD": "keyword",        # 키워드 텍스트 컬럼
     "COL_VOLUME": "search_volume",   # 검색량 컬럼 (없을 경우 임의 값 세팅 필요)
     
+    # [NEW] 추가 메타데이터 컬럼
+    "COL_METADATA": ["country", "product", "category", "cej"], 
+    
     # 분석 파라미터
     "NUM_TOPICS": 300,               # 생성할 토픽(클러스터)의 개수 (200~500 권장)
     "EMBED_BATCH_SIZE": 250,         # Vertex AI 임베딩 API 배치 크기
@@ -30,7 +33,13 @@ CONFIG = {
     
     # 결과 출력 설정
     "OUTPUT_DIR": "data",
-    "OUTPUT_FILE": "intent_analysis_result.xlsx"
+    "OUTPUT_FILE": "intent_analysis_result.xlsx",
+    
+    # [NEW] 복구(Restore) 및 체크포인트 설정
+    "USE_RESTORE": True,              # True일 경우 중간 저장된 파일이 있으면 활용
+    "CACHE_BQ_DATA": "data/bq_raw_data.csv",
+    "CACHE_EMBEDDINGS": "data/embeddings.npy",
+    "CACHE_CLUSTERS": "data/clustered_data.csv"
 }
 
 # 출력 폴더 자동 생성

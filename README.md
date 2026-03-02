@@ -1,4 +1,4 @@
-# 🔍 Intent-Map Agent: Large-scale Search Intent Analyzer
+# 🔍 Intent-Map Agent: Large-scale Search Intent Analyzer (v1.0.0)
 
 **Intent-Map Agent**는 구글 검색 키워드 데이터를 대량으로 수집하고 분석하여 고객의 '숨은 의도(Intent)'를 도출하는 AI 기반 데이터 파이프라인입니다.
 
